@@ -1,22 +1,12 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const log = std.log;
-const Bot = @import("bot_api.zig");
+const time = std.time;
+const Bot = @import("bot_api/bot_api.zig");
 
-const BOT_TOKEN = "5958520989:AAESG_D6As4ITx2UooYFNnUTQqfQ5RxdOP8";
+const BOT_TOKEN = "";
 
-const RespStruct = struct {
-    ok: bool,
-    result: struct {
-        id: u64,
-        is_bot: bool,
-        first_name: []const u8,
-        username: []const u8,
-        can_join_groups: bool,
-        can_read_all_group_messages: bool,
-        supports_inline_queries: bool,
-    },
-};
+const SLEEP_TIME = 2 * 1000 * 1000 * 1000;
 
 pub fn main() !void {
     log.info("Telegram Bot Health Checker. Started\n", .{});
@@ -25,23 +15,41 @@ pub fn main() !void {
     defer assert(gpa.detectLeaks() == false);
     var allocator = gpa.allocator();
 
-    var bot = Bot{
-        .allocator = allocator,
-        .debug = true,
-        .token = BOT_TOKEN,
-    };
-    var resp = try bot.request("getMe", RespStruct);
-    defer resp.deinit();
-    log.info("{}", .{resp.body});
+    var bot = try Bot.init(allocator, BOT_TOKEN);
+    defer bot.deinit();
+    bot.enableDebug(true);
+    var i: u32 = 0;
+    while (true) {
+        var updates = try bot.getUpdates(allocator);
+        defer updates.deinit();
+        for (updates.getSlice()) |update_object| {
+            if (update_object.message) |msg| {
+                std.debug.print("msg: {?s}\n", .{msg.text});
+            }
+        }
+        time.sleep(SLEEP_TIME);
+
+        i += 1;
+        if (i == 3) {
+            break;
+        }
+    }
 }
 
 test "botApi" {
-    var bot = Bot{
-        .allocator = &std.testing.allocator,
-        .debug = true,
-        .token = BOT_TOKEN,
-    };
-    var resp = try bot.request("getMe", RespStruct);
-    defer resp.deinit();
-    log.info("{}", .{resp.body});
+    var bot = try Bot.init(std.testing.allocator, BOT_TOKEN);
+    defer bot.deinit();
+    bot.enableDebug(true);
+    var i: u64 = 0;
+    while (i < 3) {
+        var updates = try bot.getUpdates(std.testing.allocator);
+        defer updates.deinit();
+        for (updates.getSlice()) |update_object| {
+            if (update_object.message) |msg| {
+                std.debug.print("msg: {?s}\n", .{msg.text});
+            }
+        }
+        time.sleep(SLEEP_TIME);
+        i += 1;
+    }
 }
