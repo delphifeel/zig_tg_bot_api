@@ -21,8 +21,8 @@ pub fn Response(comptime T: type) type {
             self.allocator.destroy(self.parsedJson);
         }
 
-        pub inline fn body(self: *const Self) T {
-            return self.parsedJson.value;
+        pub inline fn body(self: *Self) *T {
+            return &self.parsedJson.value;
         }
     };
 }
@@ -32,6 +32,7 @@ pub const HttpJsonClient = struct {
     client: std.http.Client,
     headers: std.http.Headers,
     responseMaxSize: u32 = 120000,
+    debug: bool = false,
 
     pub fn init(allocator: std.mem.Allocator) !*HttpJsonClient {
         var inited = HttpJsonClient{
@@ -52,16 +53,19 @@ pub const HttpJsonClient = struct {
         try self.headers.append(name, value);
     }
 
-    pub fn request(self: *HttpJsonClient, method: std.http.Method, url: []const u8, comptime T: type) !Response(T) {
+    pub fn request(self: *HttpJsonClient, method: std.http.Method, url: []const u8, comptime T: type) !?Response(T) {
         var uri = try std.Uri.parse(url);
 
-        var req = try self.client.request(method, uri, self.headers, .{});
+        if (self.debug) {
+            std.debug.print("request to {s}\n", .{url});
+        }
+
+        var req = self.client.request(method, uri, self.headers, .{}) catch return null;
         defer req.deinit();
-        try req.start(.{});
-        // try req.start();
-        try req.wait();
+        req.start(.{}) catch return null;
+        req.wait() catch return null;
         if (req.response.status != .ok) {
-            unreachable;
+            return null;
         }
 
         var body = try req.reader().readAllAlloc(self.allocator, self.responseMaxSize);

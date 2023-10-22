@@ -7,64 +7,59 @@ const ApiClient = @This();
 allocator: Allocator,
 token: []const u8,
 debug: bool,
-jsonClient: *http.HttpJsonClient,
+json_client: *http.HttpJsonClient,
 
 pub fn init(allocator: std.mem.Allocator, token: []const u8) !*ApiClient {
-    var apiClient = try allocator.create(ApiClient);
-    errdefer allocator.destroy(apiClient);
+    var api_client = try allocator.create(ApiClient);
+    errdefer allocator.destroy(api_client);
 
-    apiClient.allocator = allocator;
-    apiClient.token = token;
-    apiClient.debug = false;
-    apiClient.jsonClient = try http.HttpJsonClient.init(allocator);
-    errdefer apiClient.jsonClient.deinit();
+    api_client.allocator = allocator;
+    api_client.token = token;
+    api_client.debug = false;
+    api_client.json_client = try http.HttpJsonClient.init(allocator);
+    errdefer api_client.json_client.deinit();
 
-    return apiClient;
+    return api_client;
 }
 
-pub fn deinit(apiClient: *ApiClient) void {
-    apiClient.jsonClient.deinit();
-    apiClient.allocator.destroy(apiClient);
+pub fn deinit(api_client: *ApiClient) void {
+    api_client.json_client.deinit();
+    api_client.allocator.destroy(api_client);
 }
 
-pub fn request(apiClient: *ApiClient, allocator: Allocator, method: []const u8, comptime T: type) !ObjectHolder(T) {
-    try apiClient.jsonClient.appendHeader("accept", "application/json");
+pub fn request(api_client: *ApiClient, allocator: Allocator, method: []const u8, comptime T: type) !?ObjectHolder(T) {
+    try api_client.json_client.appendHeader("accept", "application/json");
 
-    var url = urlForMethod(allocator, apiClient.token, method);
+    var url = urlForMethod(allocator, api_client.token, method);
     defer allocator.free(url);
 
-    var jsonResp = try apiClient.jsonClient.request(.GET, url, TgBotResult(T));
+    var jsonResp = try api_client.json_client.request(.GET, url, TgBotResult(T)) orelse return null;
     errdefer jsonResp.deinit();
     var tgBotResp = jsonResp.body();
     if (!tgBotResp.ok) {
-        unreachable;
+        return null;
     }
-    return try ObjectHolder(T).init(allocator, jsonResp);
+    return ObjectHolder(T).init(jsonResp);
 }
 
 pub fn ObjectHolder(comptime T: type) type {
     return struct {
         const Self = @This();
 
-        allocator: Allocator,
         source: http.Response(TgBotResult(T)),
-        object: *T,
 
-        pub fn init(allocator: Allocator, source: http.Response(TgBotResult(T))) !Self {
-            return Self {
-                .allocator = allocator,
+        pub fn init(source: http.Response(TgBotResult(T))) Self {
+            return Self{
                 .source = source,
-                .object = try utils.createFrom(allocator, T, &source.body().result),
             };
         }
 
         pub inline fn deinit(self: *Self) void {
             self.source.deinit();
-            self.allocator.destroy(self.object);
         }
 
         pub inline fn get(self: *Self) *T {
-            return self.object;
+            return &self.source.body().result;
         }
     };
 }

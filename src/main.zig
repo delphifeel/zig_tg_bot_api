@@ -1,12 +1,27 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
 const log = std.log;
 const time = std.time;
+const utils = @import("bot_api/utils.zig");
+const string = utils.string;
 const Bot = @import("bot_api/bot_api.zig");
 
-const BOT_TOKEN = "";
+const SLEEP_TIME = 1 * 1000 * 1000 * 1000;
 
-const SLEEP_TIME = 2 * 1000 * 1000 * 1000;
+// fn readIntroText(allocator: Allocator) !string {
+//     return try std.fs.cwd().readFileAlloc(allocator, "data/intro.txt", 16000);
+// }
+
+fn sendInfo(bot: *Bot, chat_id: u64) !void {
+    _ = chat_id;
+    _ = bot;
+    // TODO: not implemented
+}
+
+fn sendBack(bot: *Bot, chat_id: u64, text: string) !void {
+    return try bot.sendMessage(chat_id, text);
+}
 
 pub fn main() !void {
     log.info("Telegram Bot Health Checker. Started\n", .{});
@@ -15,41 +30,85 @@ pub fn main() !void {
     defer assert(gpa.detectLeaks() == false);
     var allocator = gpa.allocator();
 
-    var bot = try Bot.init(allocator, BOT_TOKEN);
+    var bot_token = try std.process.getEnvVarOwned(allocator, "TOKEN");
+    defer allocator.free(bot_token);
+
+    var introText = "Hello Zig lover";
+
+    var bot = try Bot.init(allocator, bot_token);
     defer bot.deinit();
     bot.enableDebug(true);
-    var i: u32 = 0;
     while (true) {
-        var updates = try bot.getUpdates(allocator);
+        var updates = try bot.getUpdates(allocator) orelse {
+            std.debug.print("getUpdates error\n", .{});
+            continue;
+        };
         defer updates.deinit();
-        for (updates.getSlice()) |update_object| {
-            if (update_object.message) |msg| {
-                std.debug.print("msg: {?s}\n", .{msg.text});
-            }
-        }
-        time.sleep(SLEEP_TIME);
+        for (updates.getSlice()) |*update| {
+            var message = update.getMessage() orelse continue;
 
-        i += 1;
-        if (i == 3) {
-            break;
+            if (!message.isCommand()) { // ignore any non-command Messages
+                continue;
+            }
+
+            var command = message.command() orelse continue;
+
+            if (utils.stringEq(command, "/start")) {
+                try sendBack(bot, message.chatId(), introText);
+            } else if (utils.stringEq(command, "/info")) {} else {
+                try sendInfo(bot, message.chatId());
+            }
+
+            // switch (message.command()) {
+            //     "/get1" => sendVideoWithMetadata(bot, message, VIDEO_1),
+            //     "/get2" => sendVideoWithMetadata(bot, message, VIDEO_2),
+            //     "/get3" => sendVideoWithMetadata(bot, message, VIDEO_3),
+            // }
         }
+
+        time.sleep(SLEEP_TIME);
     }
 }
 
-test "botApi" {
-    var bot = try Bot.init(std.testing.allocator, BOT_TOKEN);
-    defer bot.deinit();
-    bot.enableDebug(true);
-    var i: u64 = 0;
-    while (i < 3) {
-        var updates = try bot.getUpdates(std.testing.allocator);
-        defer updates.deinit();
-        for (updates.getSlice()) |update_object| {
-            if (update_object.message) |msg| {
-                std.debug.print("msg: {?s}\n", .{msg.text});
-            }
-        }
-        time.sleep(SLEEP_TIME);
-        i += 1;
-    }
-}
+// test "botApi" {
+//     var allocator = std.testing.allocator;
+//     var bot = try Bot.init(allocator, BOT_TOKEN);
+//     defer bot.deinit();
+//     bot.enableDebug(true);
+//     var i: u32 = 0;
+//     while (true) {
+//         var updates = try bot.getUpdates(allocator) orelse {
+//             std.debug.print("getUddates error\n", .{});
+//             continue;
+//         };
+//         defer updates.deinit();
+//         for (updates.getSlice()) |*update| {
+//             var message = update.getMessage() orelse continue;
+
+//             if (!message.isCommand()) { // ignore any non-command Messages
+//                 continue;
+//             }
+
+//             var command = message.command() orelse continue;
+
+//             if (utils.stringEq(command, "/start")) {
+//                 try sendBack(bot, message.chatId(), introText);
+//             } else {
+//                 std.debug.print("unknown command: {s}\n", .{command});
+//             }
+
+//             // switch (message.command()) {
+//             //     "/start" => ,
+//             //     "/info" => sendInfo(bot, message.Chat.ID),
+//             //     "/get1" => sendVideoWithMetadata(bot, message, VIDEO_1),
+//             //     "/get2" => sendVideoWithMetadata(bot, message, VIDEO_2),
+//             //     "/get3" => sendVideoWithMetadata(bot, message, VIDEO_3),
+//             // }
+
+//         }
+//         i += 1;
+//         if (i == 3) {
+//             break;
+//         }
+//     }
+// }

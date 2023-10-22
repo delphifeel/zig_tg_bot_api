@@ -1,18 +1,35 @@
-pub const Object = struct {
-    message_id: u64,
-    from: ?UserObject = null,
-    sender_chat: ?ChatObject = null,
-    date: u64,
-    chat: ChatObject,
-    forward_from: ?UserObject = null,
-    forward_from_chat: ?ChatObject = null,
-    forward_from_message_id: ?u64 = null,
-    // reply_to_message: ?MessageObject = null,
-    has_protected_content: ?bool = null,
-    text: ?[]const u8 = null,
-    audio: ?AudioObject = null,
-    document: ?DocumentObject = null,
-};
+const string = @import("utils.zig").string;
+
+const Message = @This();
+
+message_id: u64,
+from: ?UserObject = null,
+sender_chat: ?ChatObject = null,
+date: u64,
+chat: ChatObject,
+forward_from: ?UserObject = null,
+forward_from_chat: ?ChatObject = null,
+forward_from_message_id: ?u64 = null,
+// reply_to_message: ?MessageObject = null,
+has_protected_content: ?bool = null,
+text: ?[]const u8 = null,
+audio: ?AudioObject = null,
+document: ?DocumentObject = null,
+
+pub fn chatId(message: *const Message) u64 {
+    return message.chat.id;
+}
+
+pub fn isCommand(message: *const Message) bool {
+    if (message.text) |text| {
+        return text.len > 0 and text[0] == '/';
+    }
+    return false;
+}
+
+pub fn command(message: *const Message) ?string {
+    return message.text;
+}
 
 const ChatObject = struct {
     id: u64,
@@ -26,7 +43,7 @@ const ChatObject = struct {
     // active_usernames: ?[][]const u8 = null,
     emoji_status_custom_emoji_id: ?[]const u8 = null,
     emoji_status_expiration_date: ?u64 = null,
-    bio: ?[]const u8 = null,	
+    bio: ?[]const u8 = null,
     has_private_forwards: ?bool = null,
     has_restricted_voice_and_video_messages: ?bool = null,
     join_to_send_messages: ?bool = null,
@@ -46,7 +63,7 @@ const ChatObject = struct {
 };
 
 const UserObject = struct {
-    id:	u64,	
+    id: u64,
     is_bot: bool,
     first_name: []const u8,
     last_name: ?[]const u8 = null,

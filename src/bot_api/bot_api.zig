@@ -1,24 +1,39 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
 const log = std.log;
 const http = @import("http.zig");
-const Bot = @This();
 const Updates = @import("updates.zig");
+const Message = @import("message.zig");
 const ApiClient = @import("api_client.zig");
+const string = @import("utils.zig").string;
 
-allocator: std.mem.Allocator,
+const Bot = @This();
+
+allocator: Allocator,
 apiClient: *ApiClient,
-lastUpdateId: u64 = 0,
+lastUpdateId: u32 = 0,
+
+pub fn sendMessage(bot: *Bot, chat_id: u64, text: string) !void {
+    var url = try std.fmt.allocPrint(bot.allocator, "sendMessage?chat_id={d}&text={s}", .{
+        chat_id,
+        text,
+    });
+    defer bot.allocator.free(url);
+
+    var messageHolder = try bot.apiClient.request(bot.allocator, url, Message) orelse return;
+    defer messageHolder.deinit();
+}
 
 pub inline fn enableDebug(bot: *Bot, value: bool) void {
     bot.apiClient.debug = value;
 }
 
-pub fn getUpdates(bot: *Bot, allocator: std.mem.Allocator) !Updates {
+pub fn getUpdates(bot: *Bot, allocator: std.mem.Allocator) !?Updates {
     return try Updates.fetchAll(allocator, bot.apiClient, &bot.lastUpdateId);
 }
 
-const InitError = error {Error};
+const InitError = error{Error};
 
 pub fn init(allocator: std.mem.Allocator, token: []const u8) !*Bot {
     assert(token.len > 0);
@@ -31,7 +46,9 @@ pub fn init(allocator: std.mem.Allocator, token: []const u8) !*Bot {
     errdefer bot.apiClient.deinit();
 
     // getMe as status check
-    var getMeHolder = try bot.apiClient.request(allocator, "getMe", GetMeObject);
+    var getMeHolder = try bot.apiClient.request(allocator, "getMe", GetMeObject) orelse {
+        std.debug.panic("/getMe returned null\n", .{});
+    };
     defer getMeHolder.deinit();
 
     return bot;
