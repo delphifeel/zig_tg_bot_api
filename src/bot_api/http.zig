@@ -1,28 +1,32 @@
 const std = @import("std");
 const utils = @import("utils.zig");
+const string = utils.string;
 
 pub fn Response(comptime T: type) type {
     return struct {
         const Self = @This();
 
         allocator: std.mem.Allocator,
-        parsedJson: *std.json.Parsed(T),
+        raw_body: string,
+        parsed_json: *std.json.Parsed(T),
 
-        pub fn init(allocator: std.mem.Allocator, parsedJson: *std.json.Parsed(T)) !Self {
-            var jsonCopy = try utils.createFrom(allocator, std.json.Parsed(T), parsedJson);
+        pub fn init(allocator: std.mem.Allocator, parsed_json: *std.json.Parsed(T), raw_body: string) !Self {
+            var jsonCopy = try utils.createFrom(allocator, std.json.Parsed(T), parsed_json);
             return Response(T){
                 .allocator = allocator,
-                .parsedJson = jsonCopy,
+                .parsed_json = jsonCopy,
+                .raw_body = raw_body,
             };
         }
 
         pub fn deinit(self: *Self) void {
-            self.parsedJson.deinit();
-            self.allocator.destroy(self.parsedJson);
+            self.parsed_json.deinit();
+            self.allocator.free(self.raw_body);
+            self.allocator.destroy(self.parsed_json);
         }
 
         pub inline fn body(self: *Self) *T {
-            return &self.parsedJson.value;
+            return &self.parsed_json.value;
         }
     };
 }
@@ -69,13 +73,12 @@ pub const HttpJsonClient = struct {
         }
 
         var body = try req.reader().readAllAlloc(self.allocator, self.responseMaxSize);
-        defer self.allocator.free(body);
 
         var parseOptions = std.json.ParseOptions{
             .ignore_unknown_fields = true,
-            .allocate = .alloc_always,
+            .allocate = .alloc_if_needed,
         };
         var parsedJson = try std.json.parseFromSlice(T, self.allocator, body, parseOptions);
-        return try Response(T).init(self.allocator, &parsedJson);
+        return try Response(T).init(self.allocator, &parsedJson, body);
     }
 };
