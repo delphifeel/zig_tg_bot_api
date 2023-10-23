@@ -3,15 +3,16 @@ const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
 const log = std.log;
 const time = std.time;
-const utils = @import("bot_api/utils.zig");
-const string = utils.string;
+const string_utils = @import("bot_api/utils/string.zig");
+const string = string_utils.string;
+const stringEq = string_utils.stringEq;
 const Bot = @import("bot_api/bot_api.zig");
 
 const SLEEP_TIME = 1 * 1000 * 1000 * 1000;
 
-// fn readIntroText(allocator: Allocator) !string {
-//     return try std.fs.cwd().readFileAlloc(allocator, "data/intro.txt", 16000);
-// }
+fn readIntroText(allocator: Allocator) !string {
+    return try std.fs.cwd().readFileAlloc(allocator, "data/intro.txt", 16000);
+}
 
 fn sendInfo(bot: *Bot, chat_id: u64) !void {
     _ = chat_id;
@@ -20,7 +21,7 @@ fn sendInfo(bot: *Bot, chat_id: u64) !void {
 }
 
 fn sendBack(bot: *Bot, chat_id: u64, text: string) !void {
-    return try bot.sendMessage(chat_id, text);
+    return try bot.sendMessage(chat_id, text, .{});
 }
 
 pub fn main() !void {
@@ -33,7 +34,8 @@ pub fn main() !void {
     var bot_token = try std.process.getEnvVarOwned(allocator, "TOKEN");
     defer allocator.free(bot_token);
 
-    var introText = "Hello Zig lover";
+    var introText = try readIntroText(allocator);
+    defer allocator.free(introText);
 
     var bot = try Bot.init(allocator, bot_token);
     defer bot.deinit();
@@ -53,9 +55,9 @@ pub fn main() !void {
 
             var command = message.command() orelse continue;
 
-            if (utils.stringEq(command, "/start")) {
+            if (stringEq(command, "/start")) {
                 try sendBack(bot, message.chatId(), introText);
-            } else if (utils.stringEq(command, "/info")) {} else {
+            } else if (stringEq(command, "/info")) {} else {
                 try sendInfo(bot, message.chatId());
             }
 

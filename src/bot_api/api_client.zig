@@ -1,6 +1,5 @@
 const std = @import("std");
 const http = @import("http.zig");
-const utils = @import("utils.zig");
 const Allocator = std.mem.Allocator;
 const ApiClient = @This();
 

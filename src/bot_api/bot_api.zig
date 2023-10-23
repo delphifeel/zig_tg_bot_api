@@ -6,7 +6,7 @@ const http = @import("http.zig");
 const Updates = @import("updates.zig");
 const Message = @import("message.zig");
 const ApiClient = @import("api_client.zig");
-const string = @import("utils.zig").string;
+const string = @import("utils/string.zig").string;
 
 const Bot = @This();
 
@@ -14,7 +14,12 @@ allocator: Allocator,
 apiClient: *ApiClient,
 lastUpdateId: u32 = 0,
 
-pub fn sendMessage(bot: *Bot, chat_id: u64, text: string) !void {
+const SendMessageOptions = struct {
+    parse_mode: ?string = null,
+};
+
+pub fn sendMessage(bot: *Bot, chat_id: u64, text: string, options: SendMessageOptions) !void {
+    _ = options;
     var url = try std.fmt.allocPrint(bot.allocator, "sendMessage?chat_id={d}&text={s}", .{
         chat_id,
         text,

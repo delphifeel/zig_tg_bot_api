@@ -1,6 +1,6 @@
 const std = @import("std");
-const utils = @import("utils.zig");
-const string = utils.string;
+const mem_utils = @import("utils/mem.zig");
+const string = @import("utils/string.zig").string;
 
 pub fn Response(comptime T: type) type {
     return struct {
@@ -11,7 +11,7 @@ pub fn Response(comptime T: type) type {
         parsed_json: *std.json.Parsed(T),
 
         pub fn init(allocator: std.mem.Allocator, parsed_json: *std.json.Parsed(T), raw_body: string) !Self {
-            var jsonCopy = try utils.createFrom(allocator, std.json.Parsed(T), parsed_json);
+            var jsonCopy = try mem_utils.createFrom(allocator, std.json.Parsed(T), parsed_json);
             return Response(T){
                 .allocator = allocator,
                 .parsed_json = jsonCopy,
@@ -44,7 +44,7 @@ pub const HttpJsonClient = struct {
             .headers = std.http.Headers.init(allocator),
             .client = std.http.Client{ .allocator = allocator },
         };
-        return try utils.createFrom(allocator, HttpJsonClient, &inited);
+        return try mem_utils.createFrom(allocator, HttpJsonClient, &inited);
     }
 
     pub fn deinit(self: *HttpJsonClient) void {

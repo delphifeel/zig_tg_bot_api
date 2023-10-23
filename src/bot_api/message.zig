@@ -1,4 +1,4 @@
-const string = @import("utils.zig").string;
+const string = @import("utils/string.zig").string;
 
 const Message = @This();
 
